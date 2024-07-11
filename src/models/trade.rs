@@ -14,21 +14,8 @@ pub struct Trade {
     pub profit: Option<f64>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CopyRelationship {
-    pub master_account_id: i64,
-    pub slave_account_id: i64,
-    pub risk_factor: f64,
-    #[serde(default = "default_active")]
-    pub active: bool,
-}
-
 #[derive(Debug, Deserialize)]
 pub struct SlaveInfo {
     pub slave_account_id: i64,
     pub master_account_id: i64,
-}
-
-fn default_active() -> bool {
-    true
 }

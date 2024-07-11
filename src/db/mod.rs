@@ -1,6 +1,6 @@
-use rusqlite::{Connection, Result, params};
-use crate::models::trade::{Trade};
+use crate::models::trade::Trade;
 use log::{debug, info};
+use rusqlite::{params, Connection, Result};
 
 pub fn init_db(conn: &Connection) -> Result<()> {
     conn.execute_batch(include_str!("../../migrations/init.sql"))?;
@@ -23,14 +23,18 @@ pub fn insert_master_trade(conn: &Connection, trade: &Trade) -> Result<i64> {
             &trade.profit,
         ),
     )?;
-    
+
     let id = conn.last_insert_rowid();
     debug!("Inserted new master trade with ID: {}", id);
-    
+
     Ok(id)
 }
 
-pub fn get_new_trades_for_slave(conn: &Connection, slave_account_id: i64, master_account_id: i64) -> Result<Vec<Trade>, rusqlite::Error> {
+pub fn get_new_trades_for_slave(
+    conn: &Connection,
+    slave_account_id: i64,
+    master_account_id: i64,
+) -> Result<Vec<Trade>, rusqlite::Error> {
     let query = "
         SELECT mt.* 
         FROM master_trades mt
