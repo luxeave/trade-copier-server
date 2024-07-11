@@ -47,6 +47,7 @@ async fn main() -> std::io::Result<()> {
                 web::scope("/api")
                     .route("/trade", web::post().to(trade::add_trade))
                     .route("/new-trades", web::post().to(trade::get_new_trades_for_slave))
+                    .route("/trade/close", web::post().to(trade::close_trade))
             )
     })
     .bind(&config.server_addr)?
