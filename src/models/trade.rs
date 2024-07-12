@@ -4,7 +4,8 @@ use serde::{Deserialize, Serialize};
 pub struct Trade {
     pub id: Option<i64>,
     pub master_account_id: i64,
-    pub ticket: i64,  // Add this line
+    pub ticket: i64,
+    pub master_ticket: i64,  // Add this line
     pub symbol: String,
     pub trade_type: String,
     pub volume: f64,

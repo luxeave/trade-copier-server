@@ -3,6 +3,7 @@ PRAGMA foreign_keys = ON;
 CREATE TABLE IF NOT EXISTS master_trades (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     master_account_id INTEGER NOT NULL,
+    master_ticket INTEGER NOT NULL,
     ticket INTEGER NOT NULL,
     symbol TEXT NOT NULL,
     trade_type TEXT NOT NULL,
