@@ -7,21 +7,21 @@ pub enum ApiError {
     DatabaseError(#[from] rusqlite::Error),
     #[error("Connection pool error: {0}")]
     PoolError(#[from] r2d2::Error),
-    #[error("Internal server error")]
+    #[error("Internal server error: {0}")]
     InternalServerError(String),
 }
 
 impl ResponseError for ApiError {
     fn error_response(&self) -> HttpResponse {
         match self {
-            ApiError::DatabaseError(_) => HttpResponse::InternalServerError().json("Database error occurred"),
-            ApiError::PoolError(_) => HttpResponse::InternalServerError().json("Database connection pool error"),
-            ApiError::InternalServerError(_) => HttpResponse::InternalServerError().json("Internal server error"),
+            ApiError::DatabaseError(e) => HttpResponse::InternalServerError().json(format!("Database error: {}", e)),
+            ApiError::PoolError(e) => HttpResponse::InternalServerError().json(format!("Pool error: {}", e)),
+            ApiError::InternalServerError(e) => HttpResponse::InternalServerError().json(format!("Internal error: {}", e)),
         }
     }
 }
 
-// Function to create an InternalServerError
+// You can keep your internal_error function here as well
 pub fn internal_error<E: std::fmt::Debug>(err: E) -> ApiError {
     ApiError::InternalServerError(format!("{:?}", err))
 }
