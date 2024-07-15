@@ -117,3 +117,53 @@ rustup update
 - Check MT4 journal logs for any error messages.
 - Verify server logs for request/response issues.
 - Ensure proper network connectivity between MT4 terminals and the web server.
+
+# Cross-Compiling Rust for x86 Windows from WSL
+
+This guide outlines the process to cross-compile a Rust project for x86 Windows systems when developing in Windows Subsystem for Linux (WSL).
+
+## Prerequisites
+
+- Rust installed in WSL
+- WSL (Ubuntu or similar distribution)
+
+## Setup
+
+1. Install the Windows GNU target:
+```
+rustup target add i686-pc-windows-gnu
+```
+2. Install MinGW-w64 toolchain:
+```
+sudo apt update
+sudo apt install gcc-mingw-w64
+```
+3. Create or modify `.cargo/config.toml` in your project directory:
+```toml
+[target.i686-pc-windows-gnu]
+linker = "i686-w64-mingw32-gcc"
+ar = "i686-w64-mingw32-gcc-ar"
+```
+
+## Building
+
+To build your project for x86 Windows:
+```
+cargo build --target i686-pc-windows-gnu
+```
+
+## Notes
+This method uses the GNU toolchain for Windows. If you specifically need the MSVC toolchain, additional setup may be required.
+
+## Troubleshooting
+
+If you encounter errors related to missing crates or targets, ensure that:
+
+The i686-pc-windows-gnu target is installed (rustup target list --installed)
+MinGW-w64 is correctly installed (i686-w64-mingw32-gcc --version)
+
+For persistent issues, try cleaning your project before rebuilding:
+```
+cargo clean
+cargo build --target i686-pc-windows-gnu
+```
