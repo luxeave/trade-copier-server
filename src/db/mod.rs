@@ -31,9 +31,12 @@ pub fn get_new_trades_for_slave(
         FROM master_trades mt
         LEFT JOIN slave_trades st ON mt.id = st.master_trade_id AND st.slave_account_id = ?2
         WHERE mt.master_account_id = ?1
-        AND (st.id IS NULL OR (mt.status = 'closed' AND st.status = 'open') OR mt.updated_at > st.updated_at)
-        AND (mt.status != 'closed' OR (mt.status = 'closed' AND mt.close_time >= datetime('now', '-1 minutes')))
-        AND mt.created_at >= datetime('now', '-1 minutes')
+        AND (
+            st.id IS NULL 
+            OR (mt.status = 'closed' AND st.status = 'open') 
+            OR mt.updated_at > st.updated_at
+        )
+        AND mt.updated_at >= datetime('now', '-1 minutes')
     ";
 
     let mut stmt = conn.prepare(query)?;
@@ -43,7 +46,7 @@ pub fn get_new_trades_for_slave(
             id: row.get(0)?,
             master_account_id: row.get(1)?,
             ticket: row.get(2)?,
-            master_ticket: row.get(3)?, // Add this line
+            master_ticket: row.get(3)?,
             symbol: row.get(4)?,
             trade_type: row.get(5)?,
             volume: row.get(6)?,
@@ -55,6 +58,8 @@ pub fn get_new_trades_for_slave(
             status: row.get(12)?,
             take_profit: row.get(13)?,
             stop_loss: row.get(14)?,
+            created_at: row.get(15)?,
+            updated_at: row.get(16)?,
         })
     })?;
 
@@ -116,7 +121,7 @@ pub fn get_trade_by_server_id(
             id: row.get(0)?,
             master_account_id: row.get(1)?,
             ticket: row.get(2)?,
-            master_ticket: row.get(3)?, // Add this line
+            master_ticket: row.get(3)?,
             symbol: row.get(4)?,
             trade_type: row.get(5)?,
             volume: row.get(6)?,
@@ -128,6 +133,8 @@ pub fn get_trade_by_server_id(
             status: row.get(12)?,
             take_profit: row.get(13)?,
             stop_loss: row.get(14)?,
+            created_at: row.get(15)?,
+            updated_at: row.get(16)?,
         })
     })?;
 
@@ -145,7 +152,7 @@ pub fn get_trade_by_ticket(
             id: row.get(0)?,
             master_account_id: row.get(1)?,
             ticket: row.get(2)?,
-            master_ticket: row.get(3)?, // Add this line
+            master_ticket: row.get(3)?,
             symbol: row.get(4)?,
             trade_type: row.get(5)?,
             volume: row.get(6)?,
@@ -157,6 +164,8 @@ pub fn get_trade_by_ticket(
             status: row.get(12)?,
             take_profit: row.get(13)?,
             stop_loss: row.get(14)?,
+            created_at: row.get(15)?,
+            updated_at: row.get(16)?,
         })
     })?;
 
