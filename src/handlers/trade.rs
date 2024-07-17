@@ -4,6 +4,8 @@ use r2d2_sqlite::SqliteConnectionManager;
 use crate::models::trade::{Trade, SlaveInfo, TradeClosure, TPSLUpdate};
 use crate::db;
 use crate::errors::{ApiError, internal_error};
+use futures::StreamExt;
+use serde_json;
 
 type DbPool = Pool<SqliteConnectionManager>;
 
@@ -64,7 +66,28 @@ pub async fn update_tpsl(update: web::Json<TPSLUpdate>, pool: web::Data<DbPool>)
     Ok(HttpResponse::Ok().json("TP/SL updated successfully"))
 }
 
-pub async fn add_or_update_trade(trade: web::Json<Trade>, pool: web::Data<DbPool>) -> Result<impl Responder, ApiError> {
+pub async fn add_or_update_trade(mut payload: web::Payload, pool: web::Data<DbPool>) -> Result<impl Responder, ApiError> {
+    // Read the payload
+    let mut body = web::BytesMut::new();
+    while let Some(chunk) = payload.next().await {
+        let chunk = chunk.map_err(|e| ApiError::InternalServerError(format!("Error reading payload: {}", e)))?;
+        body.extend_from_slice(&chunk);
+    }
+
+    // Log the raw payload
+    log::debug!("Received payload: {}", String::from_utf8_lossy(&body));
+
+    // Attempt to deserialize and log any error
+    let trade: Trade = match serde_json::from_str(&String::from_utf8_lossy(&body)) {
+        Ok(t) => t,
+        Err(e) => {
+            log::error!("Deserialization error: {}", e);
+            log::error!("Error offset: {}", e.column());
+            log::error!("Problematic part: {}", &String::from_utf8_lossy(&body)[e.column().saturating_sub(10)..]);
+            return Err(ApiError::InternalServerError(format!("Failed to deserialize trade: {}", e)));
+        }
+    };
+
     let conn = pool.get().map_err(ApiError::PoolError)?;
     
     let existing_trade = db::get_trade_by_ticket(&conn, trade.ticket)

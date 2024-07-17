@@ -9,12 +9,12 @@ pub fn init_db(conn: &Connection) -> Result<()> {
 
 pub fn insert_master_trade(conn: &Connection, trade: &Trade) -> Result<i64, rusqlite::Error> {
     conn.execute(
-        "INSERT INTO master_trades (master_account_id, ticket, master_ticket, symbol, trade_type, volume, open_price, open_time, close_price, close_time, profit, status, take_profit, stop_loss)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+        "INSERT INTO master_trades (master_account_id, ticket, master_ticket, symbol, trade_type, volume, open_price, open_time, close_price, close_time, profit, status, take_profit, stop_loss, expiration)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
         params![
             trade.master_account_id, trade.ticket, trade.master_ticket, trade.symbol, trade.trade_type, trade.volume,
-            trade.open_price, trade.open_time, trade.close_price, trade.close_time,
-            trade.profit, trade.status, trade.take_profit, trade.stop_loss
+            trade.open_price, trade.open_time.0.to_rfc3339(), trade.close_price, trade.close_time.as_ref().map(|dt| dt.0.to_rfc3339()),
+            trade.profit, trade.status, trade.take_profit, trade.stop_loss, trade.expiration.as_ref().map(|dt| dt.0.to_rfc3339())
         ],
     )?;
 
@@ -31,9 +31,8 @@ pub fn get_new_trades_for_slave(
         FROM master_trades mt
         LEFT JOIN slave_trades st ON mt.id = st.master_trade_id AND st.slave_account_id = ?2
         WHERE mt.master_account_id = ?1
-        AND (st.id IS NULL OR (mt.status = 'closed' AND st.status = 'open') OR mt.updated_at > st.updated_at)
-        AND (mt.status != 'closed' OR (mt.status = 'closed' AND mt.close_time >= datetime('now', '-1 minutes')))
-        AND mt.created_at >= datetime('now', '-1 minutes')
+        AND (st.id IS NULL OR mt.updated_at > st.updated_at)
+        AND mt.updated_at >= datetime('now', '-2 minutes')
     ";
 
     let mut stmt = conn.prepare(query)?;
@@ -43,18 +42,27 @@ pub fn get_new_trades_for_slave(
             id: row.get(0)?,
             master_account_id: row.get(1)?,
             ticket: row.get(2)?,
-            master_ticket: row.get(3)?, // Add this line
+            master_ticket: row.get(3)?,
             symbol: row.get(4)?,
             trade_type: row.get(5)?,
             volume: row.get(6)?,
             open_price: row.get(7)?,
-            open_time: row.get(8)?,
+            open_time: row.get::<_, String>(8)?.parse().map_err(|e| {
+                rusqlite::Error::FromSqlConversionFailure(
+                    8,
+                    rusqlite::types::Type::Text,
+                    Box::new(e),
+                )
+            })?,
             close_price: row.get(9)?,
             close_time: row.get(10)?,
             profit: row.get(11)?,
             status: row.get(12)?,
             take_profit: row.get(13)?,
             stop_loss: row.get(14)?,
+            expiration: row.get(15)?,
+            created_at: row.get(16)?,
+            updated_at: row.get(17)?,
         })
     })?;
 
@@ -82,8 +90,8 @@ pub fn update_trade(conn: &Connection, id: i64, trade: &Trade) -> Result<(), rus
         "UPDATE master_trades SET 
         master_account_id = ?1, ticket = ?2, master_ticket = ?3, symbol = ?4, trade_type = ?5, volume = ?6, 
         open_price = ?7, open_time = ?8, close_price = ?9, close_time = ?10, profit = ?11, 
-        status = ?12, take_profit = ?13, stop_loss = ?14
-        WHERE id = ?15",
+        status = ?12, take_profit = ?13, stop_loss = ?14, expiration = ?15, updated_at = datetime('now')
+        WHERE id = ?16",
         params![
             trade.master_account_id,
             trade.ticket,
@@ -92,13 +100,14 @@ pub fn update_trade(conn: &Connection, id: i64, trade: &Trade) -> Result<(), rus
             trade.trade_type,
             trade.volume,
             trade.open_price,
-            trade.open_time,
+            trade.open_time.0.to_rfc3339(),
             trade.close_price,
-            trade.close_time,
+            trade.close_time.as_ref().map(|dt| dt.0.to_rfc3339()),
             trade.profit,
             trade.status,
             trade.take_profit,
             trade.stop_loss,
+            trade.expiration.as_ref().map(|dt| dt.0.to_rfc3339()),
             id
         ],
     )?;
@@ -116,7 +125,7 @@ pub fn get_trade_by_server_id(
             id: row.get(0)?,
             master_account_id: row.get(1)?,
             ticket: row.get(2)?,
-            master_ticket: row.get(3)?, // Add this line
+            master_ticket: row.get(3)?,
             symbol: row.get(4)?,
             trade_type: row.get(5)?,
             volume: row.get(6)?,
@@ -128,6 +137,9 @@ pub fn get_trade_by_server_id(
             status: row.get(12)?,
             take_profit: row.get(13)?,
             stop_loss: row.get(14)?,
+            expiration: row.get(15)?,
+            created_at: row.get(16)?,
+            updated_at: row.get(17)?,
         })
     })?;
 
@@ -145,7 +157,7 @@ pub fn get_trade_by_ticket(
             id: row.get(0)?,
             master_account_id: row.get(1)?,
             ticket: row.get(2)?,
-            master_ticket: row.get(3)?, // Add this line
+            master_ticket: row.get(3)?,
             symbol: row.get(4)?,
             trade_type: row.get(5)?,
             volume: row.get(6)?,
@@ -157,6 +169,9 @@ pub fn get_trade_by_ticket(
             status: row.get(12)?,
             take_profit: row.get(13)?,
             stop_loss: row.get(14)?,
+            expiration: row.get(15)?,
+            created_at: row.get(16)?,
+            updated_at: row.get(17)?,
         })
     })?;
 
@@ -170,7 +185,12 @@ pub fn close_trade(
 ) -> Result<(), rusqlite::Error> {
     conn.execute(
         "UPDATE master_trades SET status = 'closed', close_price = ?, close_time = ?, profit = ? WHERE id = ?",
-        params![closure.close_price, closure.close_time, closure.profit, trade_id],
+        params![
+            closure.close_price,
+            closure.close_time.0.to_rfc3339(),
+            closure.profit,
+            trade_id
+        ],
     )?;
     Ok(())
 }
